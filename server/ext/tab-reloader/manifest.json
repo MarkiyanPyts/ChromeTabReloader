@@ -10,10 +10,10 @@
   },
   
   "background": {
-    "scripts": ["popup.js"],
+    "scripts": ["tab_reloader.js"],
     "persistent": false
   },
-  
+
   "permissions": [
    "activeTab",
    "nativeMessaging"
