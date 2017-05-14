@@ -1,20 +1,4 @@
-/*document.addEventListener('DOMContentLoaded', function() {
-  var checkPageButton = document.getElementById('checkPage');
-  checkPageButton.addEventListener('click', function() {
-
-    chrome.tabs.getSelected(null, function(tab) {
-      d = document;
-
-      alert(tab.url);
-    });
-  }, false);
-  
-  var nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
-  var nativePort.onMessage.addListener(onNativeMessage);
-}, false);*/
-
 function tabReloader() {
-    tabReloader.prototype.isEnabled = false;
     tabReloader.prototype.socket = false;
     tabReloader.prototype.isConnected = false;
     tabReloader.prototype.port = false;
@@ -26,7 +10,11 @@ function tabReloader() {
 tabReloader.prototype = {
     initListeners: function () {
         chrome.browserAction.onClicked.addListener(function(tab) {
-            this.connectToServer();
+            if (!this.isConnected) {
+                this.connectToServer();
+            } else {
+                this.disconnectFromServer();
+            }
         }.bind(this));
     },
 
@@ -38,11 +26,17 @@ tabReloader.prototype = {
 
     initSocketListeners: function () {
         this.socket.onmessage = function (ev) {
-            alert(ev.data);
+            console.log(ev.data);
         }.bind(this);
 
         this.socket.addEventListener('close', function (ev) {
-            this.socket.send('Server connection closed.');
+            chrome.browserAction.setIcon({
+                path: {
+                    "16": "img/icon_disabled_16.png",
+                    "24": "img/icon_disabled_24.png",
+                    "32": "img/icon_disabled_32.png"
+                }
+            });
             this.isConnected = false;
         }.bind(this));
     },
@@ -58,7 +52,7 @@ tabReloader.prototype = {
         this.socket.addEventListener('open', function (ev) {
             this.isConnected = true;
             this.socket.send(this.pluginName + ' connected to server!!!');
-            initSocketListeners();
+            this.initSocketListeners();
 
             chrome.browserAction.setIcon({
                 path: {
@@ -68,6 +62,10 @@ tabReloader.prototype = {
                 }
             });
         }.bind(this));
+    },
+
+    disconnectFromServer: function () {
+        this.socket.close();
     },
 
     init: function () {
