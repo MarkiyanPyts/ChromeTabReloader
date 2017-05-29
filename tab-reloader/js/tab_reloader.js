@@ -20,7 +20,7 @@ tabReloader.prototype = {
 
     setPort: function () {
         chrome.storage.sync.get(['port'], function(items) {
-            this.port = items.port || '9000';
+            this.port = items.port || '8001';
         }.bind(this));
     },
 
@@ -30,7 +30,10 @@ tabReloader.prototype = {
         chrome.storage.sync.get(['hostName'], function(items) {
             if (!items.hostName) {
                 chrome.tabs.query({active: true}, function(tabs) {
-                    tabsToReload.push(tabs[0]);
+                    tabs.forEach(function (tab) {
+                        tabsToReload.push(tab);
+                    });
+
                     callback(tabsToReload);
                 });
             } else {
@@ -55,22 +58,30 @@ tabReloader.prototype = {
         this.socket.onmessage = function (ev) {
             file = ev.data.toString();
             fileExtIndex = file.lastIndexOf('.') + 1;
-            fileExt = file.slice(fileExtIndex);
+            fileExt = file.slice(fileExtIndex),
+            fileNameStandardize = file.replace(/\\/g, '\/'),
+            indexOfLastSeparator = fileNameStandardize.lastIndexOf('/') + 1,
+            fileName = file.slice(indexOfLastSeparator);
 
-            if (file != '1' && file.indexOf('connected to server!!!') == -1) {
+            if (file != 'pong' && file.indexOf('connected to server!!!') == -1) {
                 if (fileExt === 'css') {
                     this.getTabsToReload(function (tabsToReload) {
                         tabsToReload.forEach(function (tab) {
-                            chrome.tabs.update(tab.id, {url: tab.url});
+                            chrome.tabs.sendMessage(tab.id, {file: fileName}, function(response) {
+                                console.log('message sent');
+                            });
                         });
                     });
-                    console.log('css file')
                 } else {
                     this.getTabsToReload(function (tabsToReload) {
                         tabsToReload.forEach(function (tab) {
                             chrome.tabs.update(tab.id, {url: tab.url});
                         });
                     });
+                }
+            } else {
+                if (file == 'pong') {
+                    this.isAlive = true;
                 }
             }
         }.bind(this);
@@ -101,6 +112,17 @@ tabReloader.prototype = {
             this.socket.send(this.pluginName + ' connected to server!!!');
             this.initSocketListeners();
             this.stayConnected();
+            this.isAlive = true;
+            setInterval(function () {
+                this.checkIfAlive();
+            }.bind(this), 2500);
+
+            this.getTabsToReload(function (tabsToReload) {
+                tabsToReload.forEach(function (tab) {
+                    chrome.tabs.update(tab.id, {url: tab.url});
+                });
+            });
+            
 
             chrome.browserAction.setIcon({
                 path: {
@@ -118,12 +140,24 @@ tabReloader.prototype = {
 
     stayConnected: function () {
         setTimeout(function () {
-            this.socket.send('1');
+            this.socket.send('ping');
 
             if (this.isConnected) {
                 this.stayConnected();
             }
-        }.bind(this), 10000);
+        }.bind(this), 1000);
+    },
+
+    checkIfAlive: function () {
+        this.isAlive = false;
+
+        setTimeout(function () {
+            console.log(this.isAlive)
+            if (!this.isAlive) {
+                console.log(this.isAlive)
+                this.disconnectFromServer();
+            }
+        }.bind(this), 2000);
     },
 
     init: function () {

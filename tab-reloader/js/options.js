@@ -18,7 +18,7 @@ function saveOptions() {
 
 function resetOptions() {
     chrome.storage.sync.set({
-        port: '9000',
+        port: '8001',
         hostName: ''
     }, function() {
         restoreOptions();
