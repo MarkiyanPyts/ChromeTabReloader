@@ -88,6 +88,7 @@ tabReloader.prototype = {
 
         this.socket.addEventListener('close', function (ev) {
             console.log('connection Closed')
+            clearInterval(this.aliveInterval);
             chrome.browserAction.setIcon({
                 path: {
                     "16": "img/icon_disabled_16.png",
@@ -113,7 +114,7 @@ tabReloader.prototype = {
             this.initSocketListeners();
             this.stayConnected();
             this.isAlive = true;
-            setInterval(function () {
+            this.aliveInterval = setInterval(function () {
                 this.checkIfAlive();
             }.bind(this), 2500);
 
