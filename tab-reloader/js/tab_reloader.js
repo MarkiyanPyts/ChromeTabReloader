@@ -151,11 +151,8 @@ tabReloader.prototype = {
 
     checkIfAlive: function () {
         this.isAlive = false;
-
         setTimeout(function () {
-            console.log(this.isAlive)
             if (!this.isAlive) {
-                console.log(this.isAlive)
                 this.disconnectFromServer();
             }
         }.bind(this), 2000);

@@ -22,7 +22,7 @@
 
     "background": {
         "scripts": ["js/tab_reloader.js"],
-        "persistent": false
+        "persistent": true
     },
 
     "options_ui": {
