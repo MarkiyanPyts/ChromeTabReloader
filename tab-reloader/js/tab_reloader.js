@@ -2,6 +2,9 @@ function tabReloader() {
     tabReloader.prototype.socket = false;
     tabReloader.prototype.isConnected = false;
     tabReloader.prototype.port = false;
+    tabReloader.prototype.tabsToReload = [];
+    tabReloader.prototype.isActiveTab = false;
+    tabReloader.prototype.isAlive = false;
     tabReloader.prototype.pluginName = "Tab Reloader";
 
     tabReloader.prototype.init();
@@ -9,19 +12,75 @@ function tabReloader() {
 
 tabReloader.prototype = {
     initListeners: function () {
-        chrome.browserAction.onClicked.addListener(function(tab) {
+        chrome.browserAction.onClicked.addListener(function (tab) {
             if (!this.isConnected) {
                 this.connectToServer();
             } else {
-                this.disconnectFromServer();
+                if (!this.isActiveTab) {
+                    this.getActiveTab(function (tab) {
+                        if (tab) {
+                            this.addTabToTabsToReload(tab);
+                            this.updateIconState(tab);
+                        }
+
+                        this.tabsToReload.forEach(function (tab) {
+                            chrome.tabs.update(tab.id, {url: tab.url});
+                        });
+                    }.bind(this));
+                } else {
+                    if (this.tabsToReload.length > 1) {
+                        this.getActiveTab(function (tab) {
+                            if (tab) {
+                                this.removeFromTabsToReload(tab);
+                                this.updateIconState(tab);
+                            }
+                        }.bind(this));
+                    } else {
+                        this.resetTabsToReload();
+                        this.disconnectFromServer();
+                    }
+                }
             }
         }.bind(this));
+
+        
+
+        chrome.tabs.onHighlightChanged.addListener(function () {
+            this.getActiveTab(function (tab) {
+                this.updateIconState(tab);
+            }.bind(this));
+        }.bind(this));
+
+        chrome.windows.onFocusChanged.addListener(function () {
+            this.getActiveTab(function (tab) {
+                this.updateIconState(tab);
+            }.bind(this));
+        }.bind(this));
+
+        chrome.tabs.onRemoved.addListener(function () {
+            this.updateTabsToReload();
+        }.bind(this));
     },
+    
 
     setPort: function () {
         chrome.storage.sync.get(['port'], function(items) {
             this.port = items.port || '8001';
         }.bind(this));
+    },
+
+    getActiveTab: function (callback) {
+        var activeTab = false;
+
+        chrome.windows.getCurrent({populate:true}, function (window) {
+            window.tabs.forEach(function (tab) {
+                if (tab.active) {
+                    activeTab = tab;
+                }
+            });
+
+            callback(activeTab);
+        });
     },
 
     getTabsToReload: function (callback) {
@@ -53,30 +112,29 @@ tabReloader.prototype = {
     initSocketListeners: function () {
         var fileExtIndex,
             fileExt,
-            file;
+            file,
+            fileNameStandardize,
+            indexOfLastSeparator,
+            fileName;
 
         this.socket.onmessage = function (ev) {
             file = ev.data.toString();
             fileExtIndex = file.lastIndexOf('.') + 1;
-            fileExt = file.slice(fileExtIndex),
-            fileNameStandardize = file.replace(/\\/g, '\/'),
-            indexOfLastSeparator = fileNameStandardize.lastIndexOf('/') + 1,
+            fileExt = file.slice(fileExtIndex);
+            fileNameStandardize = file.replace(/\\/g, '\/');
+            indexOfLastSeparator = fileNameStandardize.lastIndexOf('/') + 1;
             fileName = file.slice(indexOfLastSeparator);
 
             if (file != 'pong' && file.indexOf('connected to server!!!') == -1) {
                 if (fileExt === 'css') {
-                    this.getTabsToReload(function (tabsToReload) {
-                        tabsToReload.forEach(function (tab) {
-                            chrome.tabs.sendMessage(tab.id, {file: fileName}, function(response) {
-                                console.log('message sent');
-                            });
+                    this.tabsToReload.forEach(function (tab) {
+                        chrome.tabs.sendMessage(tab.id, {file: fileName}, function(response) {
+                            console.log('message sent');
                         });
                     });
                 } else {
-                    this.getTabsToReload(function (tabsToReload) {
-                        tabsToReload.forEach(function (tab) {
-                            chrome.tabs.update(tab.id, {url: tab.url});
-                        });
+                    this.tabsToReload.forEach(function (tab) {
+                        chrome.tabs.update(tab.id, {url: tab.url});
                     });
                 }
             } else {
@@ -89,15 +147,73 @@ tabReloader.prototype = {
         this.socket.addEventListener('close', function (ev) {
             console.log('connection Closed')
             clearInterval(this.aliveInterval);
-            chrome.browserAction.setIcon({
-                path: {
-                    "16": "img/icon_disabled_16.png",
-                    "24": "img/icon_disabled_24.png",
-                    "32": "img/icon_disabled_32.png"
-                }
-            });
+            this.showDisabledIcon();
             this.isConnected = false;
         }.bind(this));
+    },
+
+    updateIconState: function (currentTab) {
+        var isActive = false;
+
+        this.tabsToReload.forEach(function (tab) {
+            if (tab.id == currentTab.id) {
+                isActive = true;
+            }
+        });
+
+        if (isActive) {
+            this.showEnabledIcon();
+        } else {
+            this.showDisabledIcon();
+        }
+    },
+
+    showDisabledIcon: function () {
+        this.isActiveTab = false;
+        chrome.browserAction.setIcon({
+            path: {
+                "16": "img/icon_disabled_16.png",
+                "24": "img/icon_disabled_24.png",
+                "32": "img/icon_disabled_32.png"
+            }
+        });
+    },
+
+    showEnabledIcon: function () {
+        this.isActiveTab = true;
+        chrome.browserAction.setIcon({
+            path: {
+                "16": "img/icon_active_16.png",
+                "24": "img/icon_active_24.png",
+                "32": "img/icon_active_32.png"
+            }
+        });
+    },
+
+    addTabToTabsToReload: function (tab) {
+        this.tabsToReload.push(tab);
+    },
+
+    removeFromTabsToReload: function (activeTab) {
+        this.tabsToReload.forEach(function (tab, index) {
+            if (activeTab.id == tab.id) {
+                this.tabsToReload.splice(index, 1);
+            }
+        }.bind(this));
+    },
+
+    updateTabsToReload: function () {
+        this.tabsToReload.forEach(function (tab, index) {
+            chrome.tabs.get(tab.id, function(tabs) {
+                if (chrome.runtime.lastError) {
+                    this.tabsToReload.splice(index, 1);
+                }
+            }.bind(this));
+        }.bind(this));
+    },
+
+    resetTabsToReload: function () {
+        this.tabsToReload = [];
     },
 
     connectToServer: function () {
@@ -105,10 +221,12 @@ tabReloader.prototype = {
 
         this.socket.addEventListener('error', function (ev) {
             this.isConnected = false;
+            this.resetTabsToReload();
             alert('Error connecting to websocket server, make sure it\'s running and port ' + this.port + ' is not occupied by other process');
         }.bind(this));
 
         this.socket.addEventListener('open', function (ev) {
+            this.resetTabsToReload();
             this.isConnected = true;
             this.socket.send(this.pluginName + ' connected to server!!!');
             this.initSocketListeners();
@@ -118,20 +236,17 @@ tabReloader.prototype = {
                 this.checkIfAlive();
             }.bind(this), 2500);
 
-            this.getTabsToReload(function (tabsToReload) {
-                tabsToReload.forEach(function (tab) {
+            this.getActiveTab(function (tab) {
+                if (tab) {
+                    this.addTabToTabsToReload(tab);
+                }
+
+                this.tabsToReload.forEach(function (tab) {
                     chrome.tabs.update(tab.id, {url: tab.url});
                 });
-            });
-            
+            }.bind(this));
 
-            chrome.browserAction.setIcon({
-                path: {
-                    "16": "img/icon_active_16.png",
-                    "24": "img/icon_active_24.png",
-                    "32": "img/icon_active_32.png"
-                }
-            });
+            this.showEnabledIcon();
         }.bind(this));
     },
 

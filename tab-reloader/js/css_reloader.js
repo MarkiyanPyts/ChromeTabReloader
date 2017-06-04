@@ -4,18 +4,14 @@
             incrementedVersion = null,
             setUrl = null;
 
-        console.log(request.file)
         var filter   = Array.prototype.filter,
             matches = document.querySelectorAll('link'),
             filtered = filter.call(matches, function(item) {
                 return item.href.indexOf(request.file) != -1;
             });
-        console.log(matches)
-        console.log(filtered)
 
         if (filtered.length) {
             currentVersion = getParameterByName('v', filtered.href);
-            console.log(currentVersion);
 
             if (currentVersion !== null) {
                 incrementedVersion = parseInt(currentVersion) + 1;
@@ -24,7 +20,6 @@
                 filtered[0].href = updateUrlParameter(filtered[0].href, 'v', 1);
             }
         }
-        
     });
 
     function getParameterByName(name, url) {
