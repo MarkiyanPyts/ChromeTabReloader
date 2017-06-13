@@ -60,7 +60,7 @@ gulp.task('watch:server', function() {
 
 Once ```gulp watch:server``` command is on you will have tabReloader npm module waiting for chrome plugin to connect to it.
 
-Once chromeTabReloader in installed in your browser you can click on the green square icon in your extensions bar, it shall establish conncetion with running npm process.
+Once chromeTabReloader in installed in your browser you can click on the green circle icon in your extensions bar, it shall establish conncetion with running npm process.
 
 The tab on which you where while activating plugin shall be the one to reload once new file upload is spotted. You can activate it for multiple tabs at once.
 
