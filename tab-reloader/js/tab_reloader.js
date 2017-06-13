@@ -148,6 +148,7 @@ tabReloader.prototype = {
             console.log('connection Closed')
             clearInterval(this.aliveInterval);
             this.showDisabledIcon();
+            this.tabsToReload = [];
             this.isConnected = false;
         }.bind(this));
     },
@@ -269,6 +270,7 @@ tabReloader.prototype = {
         setTimeout(function () {
             if (!this.isAlive) {
                 this.disconnectFromServer();
+                this.connectToServer();
             }
         }.bind(this), 2000);
     },
